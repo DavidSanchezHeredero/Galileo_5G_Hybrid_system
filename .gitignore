@@ -1,0 +1,21 @@
+# MATLAB temporary files
+*.asv
+*.autosave
+*.m~
+*.slxc
+
+# MATLAB cache
+slprj/
+codegen/
+*.mexw64
+
+# Temporary files
+*.tmp
+*.log
+Thumbs.db
+.DS_Store
+
+# Simulation outputs (optional)
+results/
+figures/
+data/
