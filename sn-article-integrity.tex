@@ -1,0 +1,961 @@
+% Research manuscript developed from the supplied Springer Nature sn-article.tex.
+% The official Springer Nature sn-jnl.cls is required for compilation.
+% This is a working draft. No experimental results have been invented.
+% Literature and standards: see self-contained thebibliography section.
+\documentclass[pdflatex,sn-mathphys-num]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{url}
+\usepackage{array}
+
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+\newcommand{\mat}[1]{\mathbf{#1}}
+\newcommand{\norm}[1]{\left\lVert #1\right\rVert}
+\newcommand{\trans}{^{\mathsf T}}
+\newcommand{\prob}{\mathbb{P}}
+\newcommand{\pending}{\emph{Pending experimental evaluation}}
+\newcommand{\todo}[1]{\textbf{[TO BE COMPLETED: #1]}}
+
+\begin{document}
+
+\title[Integrity Assessment of Galileo and 5G DL-TDOA]{A Comparative Integrity Assessment Framework for Galileo and 5G DL-TDOA Positioning in Urban Canyons}
+
+% Authorship, institutional affiliations, and corresponding email must be
+% confirmed by the authors before submission. No co-authors are invented.
+\author*[1]{\fnm{David} \sur{S\'anchez-Heredero}}
+\affil*[1]{\orgname{Affiliation to be confirmed}}
+
+\abstract{Global Navigation Satellite System (GNSS) and fifth-generation (5G)
+New Radio (NR) positioning offer complementary geometries in urban environments,
+but positioning accuracy alone does not quantify the trustworthiness of a location
+estimate. This paper develops a common integrity-assessment methodology for
+single-frequency Galileo pseudorange positioning and 5G NR downlink time
+difference of arrival (DL-TDOA). For Galileo, a linearized least-squares model
+provides the nominal position covariance, while residual-based receiver
+autonomous integrity monitoring (RAIM) characterizes single-measurement fault
+detectability through central and noncentral chi-square distributions. For 5G,
+a nonlinear weighted least-squares estimator accounts for the non-diagonal
+covariance induced by common-reference TDOA measurements. Conditional horizontal
+and vertical protection bounds are derived for Gaussian errors and explicitly
+bounded timing biases. Both approaches are designed for epoch-by-epoch assessment
+within a shared simulated urban-canyon trajectory. The distinction between
+model-conditional bounds, fault-detection capability, and a fully allocated
+integrity-risk guarantee is maintained throughout. Experimental evaluation,
+including protection-level coverage, availability, fault sensitivity, and
+sensitivity to error-model assumptions, is specified but remains to be completed.
+An extension to hybrid Galileo--5G extended Kalman filtering is outlined as
+future work.}
+
+\keywords{Galileo, 5G NR, DL-TDOA, positioning integrity, protection level,
+RAIM, weighted least squares, urban canyon, sensor fusion}
+
+\maketitle
+
+\section{Introduction}\label{sec:intro}
+
+Reliable position estimation in urban environments requires more than low
+root-mean-square error. Satellite signals can be attenuated or blocked by
+buildings, whereas terrestrial 5G signals offer alternative transmitter
+geometries but are themselves vulnerable to unfavorable geometry,
+non-line-of-sight (NLOS) propagation, and imperfect network synchronization.
+An estimator may therefore report a plausible location while its actual
+position error is substantially larger than predicted.
+
+Positioning \emph{accuracy} characterizes the magnitude of an estimation
+error, whereas \emph{integrity} concerns the probability that a positioning
+system provides misleading information without an appropriate warning.
+Protection levels are meaningful only when linked to stated statistical
+assumptions, fault hypotheses, and risk allocation. Classical receiver
+autonomous integrity monitoring (RAIM) uses redundant GNSS measurements
+to test measurement consistency \cite{Brown1992,WalterEnge1995}. More recently,
+3GPP has introduced positioning integrity support for radio-access-technology
+(RAT)-dependent positioning \cite{ETSI38305}, and dedicated frameworks for
+5G positioning integrity have been investigated \cite{Bartoletti2025}.
+
+The starting point of this work is an existing simulation of a single-frequency
+Galileo receiver, a PRS-based 5G DL-TDOA positioning system, and a hybrid
+extended Kalman filter (EKF) in an urban corridor in Madrid
+\cite{SanchezHerederoThesis}. That study focused primarily on positioning
+accuracy and availability. The present manuscript adds an explicit integrity
+analysis while retaining the original scenario and differentiating existing
+simulation components from the additional integrity methodology.
+
+The methodological contributions investigated here are: (i) a directly
+comparable local East--North--Up (ENU) uncertainty representation for Galileo
+and 5G; (ii) a residual-based single-fault detection model for Galileo; (iii)
+a 5G DL-TDOA estimator and uncertainty model that retain the correlation
+introduced by a shared reference gNB; and (iv) a reproducible epoch-wise
+assessment protocol separating positioning errors, model-conditional bounds,
+and operational availability. These ingredients are established techniques;
+scientific novelty must ultimately be demonstrated through the joint
+comparison, modeling choices, and validated findings, rather than by claiming
+a new protection-level formula.
+
+\section{Integrity definitions and risk accounting}\label{sec:integrity}
+
+Let the receiver's true position at epoch $k$ be $\vect{p}_k$ and the
+estimated position be $\hat{\vect{p}}_k$, both expressed in local ENU
+coordinates. Define the horizontal and vertical errors by
+\begin{align}
+ e_{H,k} &= \sqrt{(\hat E_k-E_k)^2+(\hat N_k-N_k)^2},\label{eq:eh}\\
+ e_{V,k} &= |\hat U_k-U_k|.\label{eq:ev}
+\end{align}
+
+For protection levels $HPL_k$ and $VPL_k$, the target conditional
+properties under an explicitly specified nominal model $\mathcal{M}_0$ are
+\begin{align}
+ \prob\!\left(e_{H,k}>HPL_k\mid\mathcal{M}_0\right)&\leq\alpha_H,\label{eq:h-risk}\\
+ \prob\!\left(e_{V,k}>VPL_k\mid\mathcal{M}_0\right)&\leq\alpha_V.\label{eq:v-risk}
+\end{align}
+These inequalities do not automatically hold under unknown faults, NLOS
+biases, model mismatch, or an incorrect solution branch. A total integrity
+risk definition must also account for distinct fault hypotheses
+$\mathcal{H}_j$, their occurrence probabilities, missed-detection events,
+warning latency, and the operation's time horizon. Symbolically,
+\begin{equation}\label{eq:total-risk}
+ P_{\mathrm{HMI}}=\sum_j \prob(\mathcal{H}_j)\,
+ \prob\!\left(\mathrm{hazardous\ error\ and\ no\ timely\ alert}\mid
+ \mathcal{H}_j\right),
+\end{equation}
+where the hypotheses form a partition of the considered operating space.
+Equation~\eqref{eq:total-risk} is a risk-accounting identity, not a
+validated estimate of $P_{\mathrm{HMI}}$. For nonexclusive events,
+appropriate union bounds are required.
+
+When application-specific horizontal and vertical alert limits $HAL$
+and $VAL$ are available, the corresponding epoch-wise operational
+availability indicator is
+\begin{equation}\label{eq:avail}
+ a_k=\mathbb{1}\!\left\{\text{valid}_k,\ HPL_k\leq HAL,
+ \ VPL_k\leq VAL\right\}.
+\end{equation}
+Without specified alert limits, only positioning/PL computability can be
+reported; operational integrity availability is undefined.
+
+\section{Simulation environment and reproducibility}\label{sec:scenario}
+
+The framework reuses the urban pedestrian scenario developed in
+\cite{SanchezHerederoThesis}. Building geometry and the walking trajectory
+along the Plaza del Rey--Calle del Barquillo area of Madrid originate from
+the existing simulation. A common local ENU frame is used for transmitter
+geometry, estimated positions, and error evaluation. The original trajectory
+is sampled at 2\,Hz and the Galileo positioning stage at 1\,Hz. The 5G
+post-processing uses the epoch interval stored by its positioning simulation,
+$T_{\mathrm{5G}}$, and aligns the corresponding truth and visibility arrays.
+The exact number of evaluable epochs is determined from the exported files,
+not inferred from the nominal path duration.
+
+The 5G signal-generation stage is a representative standardized FR2
+configuration rather than a reproduction of a commercial 5G deployment in
+Madrid. The simulated transmitter locations are based on an existing
+single-operator base-station geometry; the transmitted PRS waveform,
+correlation-based timing measurements, and propagation simulation are
+performed offline. Relevant radio parameters are listed in
+Table~\ref{tab:scenario}; PRS signal structure and positioning procedures
+follow \cite{ETSI38211,ETSI38305}, with urban macro propagation informed by
+\cite{ETSI38901}.
+
+\begin{table}[t]
+\caption{Configuration inherited from the positioning simulation. These
+are simulation parameters, not measured operational-network properties.}
+\label{tab:scenario}
+\begin{tabular}{@{}p{0.47\linewidth}p{0.46\linewidth}@{}}
+\toprule
+Parameter & Model configuration\\
+\midrule
+Coordinate frame & Local ENU\\
+Trajectory / Galileo rate & 2\,Hz / 1\,Hz\\
+5G positioning rate & $1/T_{\mathrm{5G}}$ from exported data\\
+5G band / carrier frequency & FR2 n260 / 38.5\,GHz\\
+NR subcarrier spacing & 120\,kHz ($\mu=3$)\\
+5G channel bandwidth & 400\,MHz (264 PRBs)\\
+PRS generation & 12 OFDM symbols, comb size 6\\
+Propagation model & 3GPP urban macro, LOS selection\\
+Galileo error model & Single frequency; see Sec.~\ref{sec:galileo}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The original 5G positioning implementation exports
+\texttt{epochEstim}, \texttt{tdoaEstim}, \texttt{tdoaError},
+\texttt{LoSMatrix}, \texttt{LoSbStationsENU}, and the receiver ground truth.
+The integrity script reconstructs an observation vector and transmitter
+subset at each epoch. Importantly, \texttt{tdoaError} and ground-truth
+positions are used only to validate the estimator \emph{after} computation;
+they are not inputs to the operational protection-level calculation.
+
+\section{Galileo positioning and integrity model}\label{sec:galileo}
+
+\subsection{Pseudorange observation and least-squares solution}
+
+For $n_k$ visible satellites at epoch $k$, let $\vect{s}_{i,k}$ denote
+the position of satellite $i$, corrected to a common coordinate epoch, and
+$\vect{p}_k$ the receiver position. The corrected pseudorange model is
+\begin{equation}\label{eq:gnss-obs}
+ \tilde\rho_{i,k}=\norm{\vect{p}_k-\vect{s}_{i,k}}+b_k
+ +\varepsilon_{i,k}+f_{i,k},
+\end{equation}
+where $b_k=c\delta t_k$ is receiver clock bias in meters,
+$\varepsilon_{i,k}$ collects nominal residual measurement errors, and
+$f_{i,k}$ represents a measurement fault or unmodeled systematic bias.
+Corrections for satellite clocks, relativistic effects, Earth rotation,
+and atmosphere are assumed to precede estimation. This decomposition is
+consistent with the original pseudorange model in
+\cite{SanchezHerederoThesis}.
+
+The estimated state in the local navigation frame is
+$\vect{\theta}_k=[E_k,N_k,U_k,b_k]\trans$. If
+$\vect{u}_{i,k}=(\vect{s}_{i,k}-\hat{\vect{p}}_k)/
+\norm{\vect{s}_{i,k}-\hat{\vect{p}}_k}$ is the line-of-sight vector
+from the user toward satellite $i$, each row of the geometry matrix is
+\begin{equation}\label{eq:Ggnss}
+ \mat{G}_{G,k}(i,:)=[-u_{E,i,k},-u_{N,i,k},-u_{U,i,k},1],
+ \qquad \mat{G}_{G,k}\in\mathbb{R}^{n_k\times4}.
+\end{equation}
+
+After first-order linearization, $\Delta\vect{\rho}_k\simeq
+\mat{G}_{G,k}\Delta\vect{\theta}_k+\vect{\varepsilon}_k$.
+The baseline integrity implementation assumes mutually independent,
+identically distributed Gaussian pseudorange errors with
+$\sigma_G=4.6\,\mathrm{m}$, an approximate LOS uncertainty adopted in the
+original thesis, informed by the Galileo Open Service error budget\cite{GalileoSDD}. This is a \emph{simulation assumption}, not an
+environment-independent bound or an assertion that urban multipath is
+Gaussian. Under this assumption,
+\begin{align}
+ \mat{A}_{G,k}&=(\mat{G}_{G,k}\trans\mat{G}_{G,k})^{-1}
+ \mat{G}_{G,k}\trans,\label{eq:Agnss}\\
+ \mat{P}_{G,k}&=\sigma_G^2
+ (\mat{G}_{G,k}\trans\mat{G}_{G,k})^{-1}.\label{eq:Pgnss}
+\end{align}
+A valid three-dimensional position and clock estimate requires
+$n_k\geq4$ and $\operatorname{rank}(\mat{G}_{G,k})=4$.
+In computation, QR or singular-value decomposition should replace
+explicit inversion when matrices are poorly conditioned.
+
+\subsection{Nominal Gaussian horizontal and vertical bounds}
+
+Let $\mat{P}_{G,k}^{EN}$ be the East--North block of the position
+covariance, and $P_{G,k}^{UU}$ its Up variance. Define the two-sided
+vertical Gaussian quantile $q_V(\alpha)=\Phi^{-1}(1-\alpha/2)$, where
+$\Phi$ denotes the standard-normal cumulative distribution function.
+A conservative two-dimensional radial bound follows from the largest
+horizontal covariance eigenvalue:
+\begin{align}
+ HPL^{(0)}_{G,k}&=
+ \sqrt{-2\log\alpha_H}\,
+ \sqrt{\lambda_{\max}(\mat{P}_{G,k}^{EN})},\label{eq:hplgnssnom}\\
+ VPL^{(0)}_{G,k}&=
+ q_V(\alpha_V)\sqrt{P_{G,k}^{UU}}.\label{eq:vplgnssnom}
+\end{align}
+These quantities are \emph{fault-free, local, model-conditional} bounds.
+They do not by themselves provide Galileo RAIM protection against faulty
+measurements.
+
+\subsection{Residual-based RAIM fault detection}\label{sec:raim}
+
+Define the orthogonal projection onto the modeled measurement subspace
+and its residual complement:
+\begin{equation}\label{eq:gnss-BQ}
+ \mat{B}_k=\mat{G}_{G,k}\mat{A}_{G,k},\qquad
+ \mat{Q}_k=\mat{I}_{n_k}-\mat{B}_k.
+\end{equation}
+With post-fit pseudorange residuals
+$\vect{v}_k=\tilde{\vect{\rho}}_k-
+\vect{h}(\hat{\vect{\theta}}_k)$,
+the test statistic is
+\begin{equation}\label{eq:raim-stat}
+ T_k=\frac{\vect{v}_k\trans\vect{v}_k}{\sigma_G^2}.
+\end{equation}
+Under the fault-free Gaussian linearized model,
+\begin{equation}\label{eq:raim-null}
+ T_k\sim\chi^2_{\nu_k},\qquad \nu_k=n_k-4.
+\end{equation}
+For $n_k\leq4$, the residual degrees of freedom are nonpositive or zero,
+so no informative residual consistency test is available. With at least
+five linearly independent satellite observations and
+$P_{FA}\in(0,1)$, the detection threshold is
+\begin{equation}\label{eq:raim-thresh}
+ \gamma_k=F^{-1}_{\chi^2_{\nu_k}}(1-P_{FA}),
+ \qquad \text{alarm if }T_k>\gamma_k.
+\end{equation}
+
+For a single range bias of amplitude $a_i$ on satellite $i$,
+$\vect{f}=a_i\vect{e}_i$, the test statistic follows a noncentral
+chi-square distribution:
+\begin{align}
+ T_k\mid(\vect{f}=a_i\vect{e}_i)
+ &\sim\chi'^2_{\nu_k}(\lambda_{i,k}),\label{eq:raim-alt}\\
+ \lambda_{i,k}&=\frac{a_i^2}{\sigma_G^2}\,Q_{k,ii},
+ \label{eq:raim-lambda}\\
+ P_{MD,i,k}(a_i)&=F_{\chi'^2_{\nu_k}(\lambda_{i,k})}
+ (\gamma_k).\label{eq:raim-pmd}
+\end{align}
+The last equation is the missed-detection probability of the specified
+single-bias hypothesis, conditional on the stated model and threshold.
+
+\subsection{Fault sensitivity and limitations of a slope-based bound}
+
+The linearized position effect of a single-satellite bias is
+$\Delta\vect{\theta}_{f,k}\simeq\mat{A}_{G,k}\vect{f}$.
+For $Q_{k,ii}>0$ define horizontal and vertical slopes
+\begin{align}
+ S_{H,i,k}&=\frac{\sqrt{A_{G,k}(1,i)^2+A_{G,k}(2,i)^2}}
+ {\sqrt{Q_{k,ii}}},\label{eq:slopeH}\\
+ S_{V,i,k}&=\frac{|A_{G,k}(3,i)|}
+ {\sqrt{Q_{k,ii}}}.\label{eq:slopeV}
+\end{align}
+A noncentrality parameter $\lambda_\star$ can be selected such that
+\begin{equation}\label{eq:lambda-star}
+ F_{\chi'^2_{\nu_k}(\lambda_\star)}(\gamma_k)=P_{MD}^{\star},
+\end{equation}
+where $P_{MD}^{\star}$ is an \emph{allocated} missed-detection
+probability. The corresponding detection-sensitivity quantities are
+\begin{align}
+ \Delta_{H,k}^{\rm MDE}&=\sigma_G\sqrt{\lambda_\star}
+ \max_i S_{H,i,k},\label{eq:raim-Hmde}\\
+ \Delta_{V,k}^{\rm MDE}&=\sigma_G\sqrt{\lambda_\star}
+ \max_i S_{V,i,k}.\label{eq:raim-Vmde}
+\end{align}
+These are maximum position biases at the \emph{minimum detectable error}
+(MDE) condition, not automatically valid fault protection levels. As an
+intermediate engineering diagnostic, the quantities
+\begin{equation}\label{eq:raim-proxy}
+ \widetilde{HPL}_{G,k}=HPL^{(0)}_{G,k}+\Delta_{H,k}^{\rm MDE},\quad
+ \widetilde{VPL}_{G,k}=VPL^{(0)}_{G,k}+\Delta_{V,k}^{\rm MDE}
+\end{equation}
+may be plotted, but must explicitly be labeled \emph{RAIM sensitivity
+proxies}. Their interpretation as formal integrity protection levels
+would additionally require a complete fault-frequency model, an
+appropriate joint risk bound for undetected errors and the residual test,
+and verification of the adopted risk allocations
+\cite{Brown1992,WalterEnge1995}.
+
+If independent physical bounds $|f_i|\leq\bar f_i$ are justified,
+an alternative, conditional deterministic-bias bound is
+\begin{equation}\label{eq:gnss-bounded}
+ HPL_{G,k}^{\mathrm{bounded}}
+ =HPL_{G,k}^{(0)}+
+ \sum_i \bar f_i\norm{\mat{A}_{G,k}(1\!:\!2,i)}_2,
+\end{equation}
+with the analogous vertical bound
+$VPL_{G,k}^{\mathrm{bounded}}=VPL_{G,k}^{(0)}+
+\sum_i \bar f_i|A_{G,k}(3,i)|$.
+Unlike the MDE proxy, this bound uses explicit limits on all modeled
+simultaneous additive biases, but it remains local and invalid for
+unbounded faults.
+
+\section{5G NR DL-TDOA integrity model}\label{sec:5g}
+
+\subsection{Timing observation model and reference differencing}
+
+Consider $M_k$ visible terrestrial transmission--reception points (TRPs)
+with known ENU coordinates $\vect{s}_{i,k}$. Let
+$r_{i,k}(\vect{p})=\norm{\vect{p}-\vect{s}_{i,k}}$.
+The following timing model presumes that known PRS transmission
+scheduling offsets have been removed by the signal-processing chain.
+This precondition must be checked against the waveform implementation;
+otherwise a scheduling residual constitutes an additional bias.
+The estimated TOA is modeled in seconds as
+\begin{equation}\label{eq:toa5g}
+ \tilde\tau_{i,k}=\frac{r_{i,k}(\vect{p}_k)}{c}
+ +b_{UE,k}+b_{gNB,i,k}+\varepsilon_{i,k}+\beta_{i,k},
+\end{equation}
+where $b_{UE,k}$ is common UE clock error, $b_{gNB,i,k}$ is transmitter
+timing error relative to the adopted network timescale,
+$\varepsilon_{i,k}$ is random timing error, and $\beta_{i,k}$ covers
+additional deterministic or model-bounded propagation bias. The common
+receiver clock cancels in a difference, provided it is the same across
+measurements within the considered observation interval; relative
+gNB timing biases do not cancel.
+
+Taking gNB 1 as reference, define the $(M_k-1)\times M_k$ differencing matrix
+\begin{equation}\label{eq:D}
+ \mat{D}_k=\begin{bmatrix}-\vect{1}_{M_k-1}&\mat{I}_{M_k-1}\end{bmatrix},
+\end{equation}
+and the measured range-difference vector
+\begin{equation}\label{eq:ztdoa}
+ \vect{z}_k=c\mat{D}_k\tilde{\vect{\tau}}_k.
+\end{equation}
+The ideal measurement function is
+\begin{equation}\label{eq:htdoa}
+ h_{i1,k}(\vect{p})=r_{i,k}(\vect{p})-r_{1,k}(\vect{p}),
+ \qquad i=2,\ldots,M_k.
+\end{equation}
+This sign convention matches the exported simulation values
+$\mathrm{TDOA}_{i1}=\mathrm{TOA}_i-\mathrm{TOA}_1$.
+
+\subsection{Geometry matrix and correlated observation covariance}
+
+Linearizing \eqref{eq:htdoa} around $\hat{\vect{p}}_k$ gives
+\begin{equation}\label{eq:linear5g}
+ \vect{z}_k-\vect{h}_k(\hat{\vect{p}}_k)
+ \simeq\mat{G}_{5,k}\,\Delta\vect{p}_k+\vect{\eta}_k,
+\end{equation}
+with rows
+\begin{equation}\label{eq:G5g}
+ \mat{G}_{5,k}(i-1,:)=
+ \frac{(\hat{\vect{p}}_k-\vect{s}_{i,k})\trans}
+ {r_{i,k}(\hat{\vect{p}}_k)}-
+ \frac{(\hat{\vect{p}}_k-\vect{s}_{1,k})\trans}
+ {r_{1,k}(\hat{\vect{p}}_k)}.
+\end{equation}
+At least four gNBs and
+$\operatorname{rank}(\mat{G}_{5,k})=3$ are needed for an
+instantaneous unconstrained three-dimensional solution. Four gNBs
+provide no redundant TDOA measurements for residual-based fault detection.
+
+Let $\mat{C}_{\tau,k}$ denote the covariance of the individual timing
+errors, in seconds squared. Their differencing produces
+\begin{equation}\label{eq:R5g}
+ \boxed{\mat{R}_{5,k}=c^2\mat{D}_k\mat{C}_{\tau,k}
+ \mat{D}_k\trans}.
+\end{equation}
+For uncorrelated TOAs with a common standard deviation
+$\sigma_\tau$, the result simplifies to
+\begin{equation}\label{eq:R5gsimple}
+ \mat{R}_{5,k}=c^2\sigma_\tau^2
+ \left(\mat{I}_{M_k-1}+\vect{1}_{M_k-1}\vect{1}_{M_k-1}\trans\right).
+\end{equation}
+Thus diagonal elements equal $2c^2\sigma_\tau^2$ and distinct off-diagonal
+elements equal $c^2\sigma_\tau^2$. The nonzero cross-covariances arise
+from reuse of the reference TOA. Treating all TDOA measurements as
+independent would generally lead to an incorrect position covariance.
+
+\subsection{Nonlinear weighted least squares and position covariance}
+
+The 5G position is estimated by minimizing
+\begin{equation}\label{eq:wls5g}
+ \hat{\vect{p}}_k=\arg\min_{\vect{p}}
+ (\vect{z}_k-\vect{h}_k(\vect{p}))\trans
+ \mat{R}_{5,k}^{-1}
+ (\vect{z}_k-\vect{h}_k(\vect{p})).
+\end{equation}
+A Gauss--Newton step, evaluated at iterate $\vect{p}^{(t)}$, is
+\begin{equation}\label{eq:gnstep}
+ \Delta\vect{p}^{(t)}=
+ \left(\mat{G}^{\mathsf T}\mat{R}^{-1}\mat{G}\right)^{-1}
+ \mat{G}\trans\mat{R}^{-1}
+ \left(\vect{z}-\vect{h}(\vect{p}^{(t)})\right).
+\end{equation}
+The actual numerical implementation uses Cholesky whitening, QR
+factorization, and a backtracking line search rather than explicit
+matrix inversion. After convergence, the local position covariance
+and measurement-to-position sensitivity matrix are
+\begin{align}
+ \mat{P}_{5,k}&\simeq
+ (\mat{G}_{5,k}\trans\mat{R}_{5,k}^{-1}\mat{G}_{5,k})^{-1},
+ \label{eq:P5g}\\
+ \mat{K}_{5,k}&=
+ (\mat{G}_{5,k}\trans\mat{R}_{5,k}^{-1}\mat{G}_{5,k})^{-1}
+ \mat{G}_{5,k}\trans\mat{R}_{5,k}^{-1}.\label{eq:K5g}
+\end{align}
+The covariance approximation assumes convergence to the correct solution
+branch, local linearity, correct $\mat{R}_{5,k}$, and no unmodeled bias.
+Very poor geometry, rank deficiency, or failed numerical convergence
+causes the epoch to be flagged invalid.
+
+\subsection{Gaussian and bounded-bias protection levels}
+
+Let $\vect{\beta}_{\tau,k}$ denote the total uncorrected timing bias,
+including residual gNB synchronization error and modeled NLOS excess
+delay, in seconds. The propagated local position error is
+\begin{equation}\label{eq:Ktoa}
+ \Delta\vect{p}_{\beta,k}\simeq
+ \underbrace{c\mat{K}_{5,k}\mat{D}_k}_{\mat{K}_{\tau,k}}
+ \vect{\beta}_{\tau,k}.
+\end{equation}
+Assume justified componentwise bounds
+$|\beta_{\tau,j,k}|\leq \bar\beta_{j,k}$ and define
+$\mat{K}_{\tau,k}^{EN}$ as the first two rows of $\mat{K}_{\tau,k}$.
+The triangle inequality yields conservative bias contributions
+\begin{align}
+ B_{H,k}&=\sum_{j=1}^{M_k}\bar\beta_{j,k}
+ \norm{\mat{K}_{\tau,k}^{EN}(:,j)}_2,\label{eq:BH5g}\\
+ B_{V,k}&=\sum_{j=1}^{M_k}\bar\beta_{j,k}
+ |K_{\tau,k}(3,j)|.\label{eq:BV5g}
+\end{align}
+For the Gaussian part of the position error, the horizontal radial
+and vertical two-sided bounds become
+\begin{align}
+ HPL_{5,k}&=B_{H,k}+
+ \sqrt{-2\log\alpha_H}\,
+ \sqrt{\lambda_{\max}(\mat{P}_{5,k}^{EN})},
+ \label{eq:HPL5g}\\
+ VPL_{5,k}&=B_{V,k}+
+ \Phi^{-1}(1-\alpha_V/2)\sqrt{P_{5,k}^{UU}}.
+ \label{eq:VPL5g}
+\end{align}
+For bounded deterministic bias and zero-mean Gaussian random error,
+these are conservative, \emph{local model-conditional} bounds.
+A mathematical derivation is provided in Appendix~\ref{app:bounds}.
+An unbounded NLOS error, a clock jump outside the assumed bound, or a
+covariance mismatch invalidates the stated probability coverage.
+
+In the current implementation, the illustrative parameters are
+$\sigma_\tau=1\,\mathrm{ns}$ and
+$\alpha_H=\alpha_V=5\times10^{-8}$; the synchronization and
+NLOS bias bounds are initialized to zero. These are explicitly
+\emph{uncalibrated scenario inputs}. A zero bias bound represents a
+fault-free hypothesis, not evidence that synchronization or NLOS
+errors vanish. The two tail allocations sum to $10^{-7}$ for the
+combined nominal horizontal/vertical exceedance event using a union
+bound; they do not establish an unconditional integrity risk of
+$10^{-7}$ per epoch or per mission.
+
+\section{Epoch-wise implementation and validation protocol}\label{sec:method}
+
+The proposed assessment is implemented as post-processing of the original
+Galileo and 5G simulation outputs; this separation avoids changing the
+underlying signal-generation experiments. At each epoch, the 5G routine
+uses the gNBs marked visible in \texttt{LoSMatrix}; the first visible gNB
+is the reference corresponding to the stored \texttt{tdoaEstim} row.
+The reference gNB may change between epochs. Because only TDOA
+measurements are stored, a synthetic TOA vector
+$[0,\Delta\tau_{21},\ldots,\Delta\tau_{M1}]\trans$ is used.
+Its common time origin is arbitrary, but multiplying by $\mat{D}_k$
+recovers the observed differences exactly. This reconstruction does
+\emph{not} recover independent physical TOAs or calibrate their covariance.
+
+A valid 5G positioning epoch requires a compatible observation subset,
+adequate geometric rank, finite inputs, a positive-definite TDOA
+covariance, and successful WLS convergence. The result includes
+$\hat{\vect{p}}_k$, $\mat{G}_{5,k}$, $\mat{R}_{5,k}$,
+$\mat{P}_{5,k}$, $HPL_{5,k}$, $VPL_{5,k}$,
+the selected reference gNB, the number of measurements,
+and a diagnostic status flag. The original 5G position estimate is
+used as the \emph{initial guess} only; the reported protection levels
+correspond to the newly computed WLS estimate, not the original
+algebraic TDOA solution.
+
+\begin{algorithm}[t]
+\caption{Per-epoch 5G DL-TDOA conditional integrity computation}
+\label{alg:5g}
+\begin{algorithmic}[1]
+\Require Saved TDOA data, gNB geometry, initial 5G positions,
+$\mat{C}_{\tau,k}$, $\bar{\vect{\beta}}_k$, $\alpha_H$, $\alpha_V$
+\For{each 5G positioning epoch $k$}
+  \State Determine visible gNB indices and epoch-specific reference
+  \If{fewer than four usable gNBs or inconsistent TDOA indices}
+    \State Mark epoch invalid; \textbf{continue}
+  \EndIf
+  \State Reconstruct equivalent relative TOA vector
+  \State Form $\mat{D}_k$, $\vect{z}_k$ and $\mat{R}_{5,k}$
+  \State Solve nonlinear WLS using whitening and line search
+  \If{geometry invalid or WLS does not converge}
+    \State Mark epoch invalid; \textbf{continue}
+  \EndIf
+  \State Compute $\mat{G}_{5,k}$, $\mat{P}_{5,k}$ and $\mat{K}_{\tau,k}$
+  \State Compute $HPL_{5,k}$ and $VPL_{5,k}$ using
+    Eqs.~\eqref{eq:HPL5g}--\eqref{eq:VPL5g}
+  \State Store validity, PLs, covariance, reference and geometry
+  \State Separately compute truth-based errors for retrospective validation
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Galileo epochs are processed analogously, but with the Galileo
+pseudorange geometry matrix, at least four satellites for LS, and
+at least five for residual-based RAIM detection. Under the simplified
+single-fault model, the residual test and MDE sensitivity analysis are
+computed only when the requisite redundancy is available.
+
+\subsection{Evaluation indicators}\label{sec:metrics}
+
+Let $\mathcal{V}_S$ be the set of valid solution epochs for technology
+$S\in\{G,5\}$, and let $N_{\mathrm{all},S}$ be the total number of
+epochs considered. The following quantities will be reported:
+\begin{align}
+ A_{\mathrm{comp},S}&=\frac{|\mathcal{V}_S|}{N_{\mathrm{all},S}},
+ \label{eq:Acomp}\\
+ \widehat p_{H,S}&=\frac{1}{|\mathcal{V}_S|}
+ \sum_{k\in\mathcal{V}_S}\mathbb{1}\{e_{H,k}>HPL_{S,k}\},
+ \label{eq:pHobs}\\
+ \widehat p_{V,S}&=\frac{1}{|\mathcal{V}_S|}
+ \sum_{k\in\mathcal{V}_S}\mathbb{1}\{e_{V,k}>VPL_{S,k}\}.
+ \label{eq:pVobs}
+\end{align}
+Observed exceedance frequencies are descriptive diagnostics and are not
+proofs of target probabilities as small as $10^{-8}$.
+The interpretation depends on the available number of independent
+trials, temporal correlation, and uncertainty of the underlying
+fault and measurement distributions.
+
+Further indicators are the median and 95th percentile of valid-epoch
+$HPL$ and $VPL$, the proportion of epochs satisfying specified
+$HAL$/$VAL$, the number of gNBs or satellites used, and the
+condition number of the geometry matrix. Results should be stratified
+by LOS count, geometry quality, and error-model scenario. A residual
+threshold alert is reported separately from a numerical PL
+exceedance observed with ground truth.
+
+\section{Extension to hybrid Galileo--5G filtering}\label{sec:ekf}
+
+The master's thesis already implements a state-space EKF combining the
+positioning modalities \cite{SanchezHerederoThesis}. The integrity-aware
+EKF analysis is \emph{planned but not yet implemented or validated}.
+One consistent state parameterization, with receiver clock bias in
+meters, is
+\begin{equation}\label{eq:ekf-state}
+ \vect{x}_k=[E_k,N_k,U_k,v_{E,k},v_{N,k},v_{U,k},b_k]\trans.
+\end{equation}
+For a constant-velocity process model,
+\begin{align}
+ \hat{\vect{x}}_{k}^{-}&=\mat{F}_k\hat{\vect{x}}_{k-1}^{+},
+ \label{eq:ekf-pred1}\\
+ \mat{P}_{k}^{-}&=\mat{F}_k\mat{P}_{k-1}^{+}\mat{F}_k\trans
+ +\mat{Q}_k.\label{eq:ekf-pred2}
+\end{align}
+A generic measurement update uses the innovation
+$\vect{y}_k=\vect{z}_k-\vect{h}(\hat{\vect{x}}_k^-)$,
+innovation covariance $\mat{S}_k=\mat{H}_k\mat{P}_k^-
+\mat{H}_k\trans+\mat{R}_k$, and gain
+$\mat{L}_k=\mat{P}_k^-\mat{H}_k\trans\mat{S}_k^{-1}$.
+Numerically, the Joseph covariance update is preferred:
+\begin{equation}\label{eq:joseph}
+ \mat{P}_k^+=(\mat{I}-\mat{L}_k\mat{H}_k)\mat{P}_k^-
+ (\mat{I}-\mat{L}_k\mat{H}_k)\trans+
+ \mat{L}_k\mat{R}_k\mat{L}_k\trans.
+\end{equation}
+For Galileo pseudoranges, the clock-bias column of the Jacobian is
+unity; for 5G range-difference measurements, that column is zero.
+The 5G measurement-noise matrix must retain the common-reference
+correlation in Eq.~\eqref{eq:R5g}.
+
+\emph{Crucially}, applying the instantaneous Gaussian PL equations to
+$\mat{P}_k^+$ alone does not establish filter integrity. An EKF can
+propagate faults over time; temporal dependence, prior-state errors,
+process-model mismatch, innovations, and fault-detection/exclusion
+hypotheses must be modeled. These issues form a separate research
+extension, not a demonstrated result of this paper.
+
+\section{Results: predefined analyses awaiting simulation output}\label{sec:results}
+
+This section defines the intended results and presentation format.
+No quantitative results from the new integrity analysis are available
+for inclusion in the current manuscript. All numerical cells and
+figure panels below are deliberately left unpopulated.
+
+\subsection{Positioning and integrity availability}
+
+Table~\ref{tab:avail-results} will report valid-epoch fractions and
+availability under explicit application alert limits. The distinction
+between insufficient geometry, solver failure, and exceeded PL shall
+be preserved.
+
+\begin{table}[t]
+\caption{Planned availability comparison. Numerical results pending.
+$HAL$ and $VAL$ must be selected before computing operational availability.}
+\label{tab:avail-results}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Metric & Galileo LS & Galileo RAIM & 5G WLS\\
+\midrule
+Total evaluated epochs & TBD & TBD & TBD\\
+Valid position epochs & TBD & TBD & TBD\\
+Valid covariance/PL epochs & TBD & TBD & TBD\\
+RAIM test-available epochs & N/A & TBD & N/A\\
+PL below $HAL$/$VAL$ & TBD & TBD & TBD\\
+Computability, \% & TBD & TBD & TBD\\
+Operational availability, \% & TBD & TBD & TBD\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Protection levels versus actual error}
+
+Figures~\ref{fig:horizontal-placeholder} and
+\ref{fig:vertical-placeholder} reserve space for the epoch-wise
+horizontal and vertical position errors and their corresponding
+model-conditional protection levels. For Galileo, the plotted
+RAIM MDE sensitivity proxy must be visibly distinguished from the
+nominal bound and from any later validated integrity PL.
+
+\begin{figure}[t]
+\centering
+\fbox{\begin{minipage}[c][36mm][c]{0.91\linewidth}
+\centering \textbf{Horizontal error and HPL versus epoch}\\[2mm]
+\emph{Insert Galileo and 5G plots from the validated simulation.}\\
+\emph{Optional: $HAL$ and fault-alarm markers.}
+\end{minipage}}
+\caption{Planned time-series comparison of horizontal positioning error and
+model-conditional HPL for Galileo and 5G. Data and curves pending.}
+\label{fig:horizontal-placeholder}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\fbox{\begin{minipage}[c][36mm][c]{0.91\linewidth}
+\centering \textbf{Vertical error and VPL versus epoch}\\[2mm]
+\emph{Insert Galileo and 5G plots from the validated simulation.}\\
+\emph{Optional: $VAL$ and geometry-validity markers.}
+\end{minipage}}
+\caption{Planned time-series comparison of absolute vertical error and
+model-conditional VPL for Galileo and 5G. Data and curves pending.}
+\label{fig:vertical-placeholder}
+\end{figure}
+
+\begin{table}[t]
+\caption{Planned protection-level coverage and accuracy metrics, conditioned
+on valid-epoch solutions. No numerical results have been inserted.}
+\label{tab:pl-results}
+\begin{tabular}{@{}p{0.43\linewidth}p{0.24\linewidth}p{0.24\linewidth}@{}}
+\toprule
+Metric & Galileo & 5G DL-TDOA\\
+\midrule
+Horizontal RMSE (m) & TBD & TBD\\
+Median / 95th-percentile HPL (m) & TBD / TBD & TBD / TBD\\
+Median / 95th-percentile VPL (m) & TBD / TBD & TBD / TBD\\
+Horizontal exceedances (count) & TBD & TBD\\
+Vertical exceedances (count) & TBD & TBD\\
+PL/geometry rejection epochs (count) & TBD & TBD\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Geometry and failure sensitivity}
+
+The analysis will study the relation between transmitter visibility,
+geometry conditioning, and protection levels. Particular attention will
+be given to epochs with exactly four gNBs, where 5G has no redundant
+TDOA observations, and to Galileo epochs with four satellites, where
+position may be available without residual RAIM detectability.
+
+For Galileo, the residual statistic $T_k$, threshold $\gamma_k$,
+$P_{FA}$, $P_{MD}^{\star}$, and worst-case slope will be evaluated under
+explicit injected single-satellite bias scenarios. A separate study
+should inject bounded gNB timing offsets and NLOS delays to quantify
+how 5G bounds deteriorate as assumptions are relaxed.
+
+\subsection{Impact of TDOA covariance modeling}
+
+The simulation will compare three analyses using the same saved
+observations: (i) the original algebraic 5G position estimate,
+(ii) WLS with the full, common-reference covariance
+$\mat{R}_{5,k}$, and (iii) a deliberately misspecified WLS model
+that discards the off-diagonal covariance terms. Only the full-
+covariance model is adopted for the main integrity results; the
+diagonal approximation is included as a controlled ablation.
+Table~\ref{tab:cov-ablation} defines the intended comparison.
+
+\begin{table}[t]
+\caption{Planned covariance-model ablation (all results pending).}
+\label{tab:cov-ablation}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Method & Horizontal RMSE & Median HPL & HPL exceedances\\
+\midrule
+Original 5G estimator & TBD & N/A & N/A\\
+WLS, full $\mat{R}_{5,k}$ & TBD & TBD & TBD\\
+WLS, diagonal $\mat{R}_{5,k}$ & TBD & TBD & TBD\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Statistical evaluation plan}
+
+The following experiment families are reserved for quantitative study:
+(i) LOS-only Gaussian noise with calibrated variances; (ii) unequal
+per-link variances and shared reference effects; (iii) bounded
+synchronization errors; (iv) NLOS bias distributions or worst-case
+bounds; and (v) single-fault Galileo RAIM detection sweeps. Sensitivity
+plots will vary $\sigma_G$, $\sigma_\tau$, $\alpha_H$,
+$\alpha_V$, and fault assumptions independently. Any estimate of
+rare integrity risk will require a statistically justified evaluation
+procedure; a short single-trajectory simulation is insufficient to
+verify probabilities on the order of $10^{-8}$.
+
+\section{Discussion}\label{sec:discussion}
+
+The two sensing modalities share a least-squares foundation, but their
+measurement transformations differ. Galileo pseudoranges explicitly
+include the receiver clock state, whereas DL-TDOA removes the common
+receiver clock bias at the cost of correlated difference errors and
+sensitivity to network synchronization. For the same ENU frame,
+comparison of the corresponding position covariance blocks is valid
+only after measurement units and covariance conventions are matched.
+
+A common scalar $\sigma_G$ simplifies Galileo simulation analysis, but
+urban canyon conditions do not imply identically distributed or
+zero-mean pseudorange errors. In particular, the thesis's elevated
+NLOS variance approximation does not guarantee that excess-path
+biases are bounded or symmetric. Similarly, applying a fixed
+$\sigma_\tau=1\,\mathrm{ns}$ to every gNB is an illustrative
+configuration, not an experimentally calibrated statement about
+PRS delay-estimation uncertainty. These are major threats to
+integrity validity, not merely implementation details.
+
+A key distinction is required between observability and fault
+monitorability. Four satellites (including receiver-clock unknown)
+or four gNBs (three independent TDOAs) may suffice for a position,
+but do not supply residual redundancy for a global consistency test.
+Moreover, low post-fit residuals do not exclude coherent or
+weakly observable errors. Rigorous operational integrity therefore
+requires explicit fault hypotheses and alert procedures, consistent
+with the broader integrity literature \cite{Brown1992,Bartoletti2025}.
+
+The intended scientific value lies in empirically quantifying the
+tradeoffs among geometry, timing uncertainty, fault detectability,
+and protection-level availability in the same urban corridor.
+Neither new mathematical equations nor an integrity improvement
+relative to prior work can be asserted until those comparisons are
+performed and independently verified.
+
+\section{Conclusions and future work}\label{sec:conclusions}
+
+An epoch-wise comparative integrity-assessment framework has been
+formulated for Galileo least-squares pseudorange positioning and
+5G NR DL-TDOA weighted least squares. The Galileo methodology
+combines local covariance analysis with a residual-based single-fault
+RAIM model. The 5G methodology propagates correlated common-reference
+TDOA uncertainty and explicitly bounded timing biases into
+horizontal and vertical conditional protection levels.
+
+The current contribution is a specified and implemented analysis
+workflow rather than a demonstrated integrity-performance advantage.
+Future work will calibrate timing and pseudorange error models,
+inject realistic multipath and synchronization faults, perform
+risk-consistent RAIM evaluation, quantify actual model-bound
+exceedances and availability, and extend the assessment to the
+hybrid EKF with temporal fault propagation. Conclusions on
+comparative performance will be added only after results are
+reproduced and validated.
+
+\backmatter
+
+\bmhead{Acknowledgements}
+\todo{Confirm acknowledgements, grants and institutional contributions.}
+
+\section*{Declarations}
+\textbf{Funding.} \todo{Declare funding or state none.}
+
+\textbf{Conflict of interest.} \todo{Confirm.}
+
+\textbf{Data availability.} The mathematical formulation and intended data
+products are described herein. \todo{Insert archived dataset identifier or repository
+URL and reproducibility conditions after validation.}
+
+\textbf{Code availability.} A MATLAB positioning simulation and an
+associated integrity post-processing implementation are used.
+\todo{Insert stable repository commit or archival DOI before submission.}
+
+\textbf{Author contributions.} \todo{Complete after authorship is finalized.}
+
+\begin{appendices}
+\section{Derivation of TDOA correlation and Gaussian position bounds}
+\label{app:bounds}
+
+For identical independent timing errors,
+$\mat{C}_\tau=\sigma_\tau^2\mat{I}_M$,
+Eq.~\eqref{eq:R5g} gives
+\begin{align}
+ \mat{D}\mat{D}\trans&=
+ \mat{I}_{M-1}+\vect{1}_{M-1}\vect{1}_{M-1}\trans,\\
+ \operatorname{Var}(c(\varepsilon_i-\varepsilon_1))&=
+ 2c^2\sigma_\tau^2,\\
+ \operatorname{Cov}(c(\varepsilon_i-\varepsilon_1),
+ c(\varepsilon_j-\varepsilon_1))&=
+ c^2\sigma_\tau^2\quad(i\ne j).
+\end{align}
+
+Let the horizontal random positioning error be
+$\vect{w}_{EN}\sim\mathcal{N}(\vect{0},\mat{P}^{EN})$.
+With $\vect{z}\sim\mathcal{N}(\vect{0},\mat{I}_2)$ we may write
+$\vect{w}_{EN}=(\mat{P}^{EN})^{1/2}\vect{z}$, so
+\begin{equation}\label{eq:radial-proof}
+ \norm{\vect{w}_{EN}}_2\leq
+ \sqrt{\lambda_{\max}(\mat{P}^{EN})}\norm{\vect{z}}_2.
+\end{equation}
+Because $\norm{\vect{z}}_2^2\sim\chi^2_2$ and
+$\prob(\chi_2^2>x)=\exp(-x/2)$, a sufficient radius for tail
+probability $\alpha_H$ is
+$\sqrt{\lambda_{\max}(\mat{P}^{EN})}\sqrt{-2\ln\alpha_H}$.
+With bounded biases, $\norm{\vect{w}_{EN}+\vect{b}_{EN}}
+\leq\norm{\vect{w}_{EN}}+\norm{\vect{b}_{EN}}$.
+Applying the triangle inequality again to
+$\vect{b}_{EN}=\sum_j\mat{K}_\tau^{EN}(:,j)\beta_j$
+proves the addition of $B_H$ in Eq.~\eqref{eq:HPL5g}.
+The analogous scalar Gaussian inequality proves
+Eq.~\eqref{eq:VPL5g}. All bounds use a first-order local
+measurement-to-position mapping.
+
+\section{Residual RAIM statistic under a single range bias}
+\label{app:raim}
+
+For full column rank $\mat{G}_G$ with $n>4$, the matrix
+$\mat{Q}=\mat{I}-\mat{G}_G(\mat{G}_G\trans\mat{G}_G)^{-1}
+\mat{G}_G\trans$ is symmetric and idempotent, with
+$\operatorname{rank}(\mat{Q})=n-4$. In the linearized model,
+$\vect{v}\simeq\mat{Q}(\vect{\varepsilon}+a_i\vect{e}_i)$.
+The whitened quadratic form
+$\vect{v}\trans\vect{v}/\sigma_G^2$ is therefore central
+chi-square under $a_i=0$ and noncentral chi-square with
+\begin{equation}
+ \lambda_i=\frac{a_i^2}{\sigma_G^2}\vect{e}_i\trans
+ \mat{Q}\vect{e}_i=\frac{a_i^2 Q_{ii}}{\sigma_G^2}
+\end{equation}
+under a single additive fault. The local position error is
+$\mat{A}_G\vect{\varepsilon}+a_i\mat{A}_G\vect{e}_i$,
+which motivates the slope definitions in
+Eqs.~\eqref{eq:slopeH} and~\eqref{eq:slopeV}. Fault detection
+and the joint hazard probability remain distinct questions.
+
+\end{appendices}
+
+\begin{thebibliography}{99}
+\bibitem{SanchezHerederoThesis}
+D. S\'anchez-Heredero Mart\'inez,
+\emph{5G Assisted Precise Positioning in GNSS},
+Master's thesis manuscript, Master's in Wireless Communications,
+2026. Underlying simulation supplied by the author.
+
+\bibitem{GalileoSDD}
+European Union Agency for the Space Programme,
+\emph{Galileo Open Service: Service Definition Document},
+Issue 1.3, November 2023.
+\url{https://www.gsc-europa.eu/electronic-library/programme-reference-documents/galileo-in-force/open-service}.
+
+\bibitem{Brown1992}
+R. G. Brown, A baseline GPS RAIM scheme and a note on the equivalence
+of three RAIM methods, \emph{NAVIGATION}, vol. 39, no. 3,
+pp. 301--316, 1992.
+\url{https://doi.org/10.1002/j.2161-4296.1992.tb02278.x}.
+
+\bibitem{WalterEnge1995}
+T. Walter and P. Enge, Weighted RAIM for precision approach,
+\emph{Proc. 8th International Technical Meeting of the Satellite
+Division of The Institute of Navigation (ION GPS 1995)},
+pp. 1995--2004, September 1995.
+\url{https://www.ion.org/publications/abstract.cfm?articleID=2524}.
+
+\bibitem{ETSI38305}
+ETSI, \emph{5G; NG Radio Access Network (NG-RAN); Stage 2
+Functional Specification of User Equipment (UE) Positioning in NG-RAN},
+ETSI TS 138 305 V18.7.0 (3GPP TS 38.305, Release 18), February 2026.
+\url{https://www.etsi.org/deliver/etsi_ts/138300_138399/138305/18.07.00_60/ts_138305v180700p.pdf}.
+
+\bibitem{ETSI38211}
+ETSI, \emph{5G; NR; Physical Channels and Modulation},
+ETSI TS 138 211 V18.7.0 (3GPP TS 38.211, Release 18), July 2025.
+\url{https://www.etsi.org/deliver/etsi_ts/138200_138299/138211/18.07.00_60/ts_138211v180700p.pdf}.
+
+\bibitem{ETSI38901}
+ETSI, \emph{5G; Study on Channel Model for Frequencies from
+0.5 to 100\,GHz}, ETSI TR 138 901 V18.1.0
+(3GPP TR 38.901, Release 18), February 2026.
+\url{https://www.etsi.org/deliver/etsi_tr/138900_138999/138901/18.01.00_60/tr_138901v180100p.pdf}.
+
+\bibitem{Bartoletti2025}
+S. Bartoletti, I. Palam\`a, L. Chiaraviglio, S. Modarres Razavi,
+Y. Zhao, G. Bianchi, and N. Blefari Melazzi,
+Positioning integrity via uncertainty quantification,
+\emph{IEEE Transactions on Vehicular Technology},
+vol. 74, no. 1, pp. 1224--1237, January 2025.
+\url{https://doi.org/10.1109/TVT.2024.3457861}.
+\end{thebibliography}
+
+\end{document}
